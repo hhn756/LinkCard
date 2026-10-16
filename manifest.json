@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "链接分享卡片",
+  "version": "1.0.0",
+  "description": "把当前网页转成一张可分享的卡片图片（标题 / 备注 / 封面 / 二维码）",
+  "permissions": ["scripting", "clipboardWrite"],
+  "host_permissions": ["http://*/*", "https://*/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "生成分享卡片"
+  }
+}

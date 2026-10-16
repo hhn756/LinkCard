@@ -1,0 +1,112 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 320px;
+  margin: 0;
+  padding: 14px;
+  font: 13px/1.5 "Microsoft YaHei", "PingFang SC", sans-serif;
+  color: #1f2329;
+  background: #fff;
+}
+
+h1 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.page {
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #f5f6f7;
+}
+
+.ptitle {
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.purl {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #8b9098;
+  word-break: break-all;
+}
+
+.field {
+  display: block;
+  margin-bottom: 10px;
+}
+
+.field > span {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: #646a73;
+}
+
+input,
+textarea {
+  width: 100%;
+  padding: 5px 7px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  font: inherit;
+  resize: vertical;
+}
+
+input:focus,
+textarea:focus {
+  border-color: #4b8bff;
+  outline: none;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+}
+
+.row .field {
+  flex: 1;
+}
+
+button {
+  width: 100%;
+  padding: 7px 0;
+  border: none;
+  border-radius: 4px;
+  background: #4b8bff;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  background: #c4c8cd;
+  cursor: default;
+}
+
+.msg {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #646a73;
+}
+
+.msg.error {
+  color: #d64a4a;
+}
+
+.preview {
+  margin-top: 10px;
+  text-align: center;
+}
+
+.preview canvas {
+  display: block;
+  margin: 0 auto;
+  border: 1px solid #e5e6eb;
+  border-radius: 4px;
+}

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <h1>链接分享卡片</h1>
+
+  <div class="page">
+    <div id="ptitle" class="ptitle">读取中…</div>
+    <div id="purl" class="purl"></div>
+  </div>
+
+  <label class="field">
+    <span>卡片标题</span>
+    <input id="title" type="text" placeholder="留空则不显示">
+  </label>
+
+  <label class="field">
+    <span>备注</span>
+    <textarea id="note" rows="3" placeholder="留空则中部显示封面大图"></textarea>
+  </label>
+
+  <div class="row">
+    <label class="field">
+      <span>宽</span>
+      <input id="w" type="number" value="400" min="200" max="2000" step="10">
+    </label>
+    <label class="field">
+      <span>高</span>
+      <input id="h" type="number" value="560" min="200" max="2000" step="10">
+    </label>
+  </div>
+
+  <button id="go" disabled>生成并复制</button>
+  <div id="msg" class="msg"></div>
+  <div id="preview" class="preview"></div>
+
+  <script src="qrcode.js"></script>
+  <script src="card.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
