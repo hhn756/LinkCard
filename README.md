@@ -2,7 +2,11 @@
 
 一个 Chrome 扩展（Manifest V3）：把当前网页一键生成一张可分享的卡片图片，自动复制到剪贴板，直接粘贴发送。
 
-<p align="center"><img src="docs/screenshot.png" width="360" alt="生成的分享卡片示例"></p>
+<p align="center">
+   <img src="docs/show_1.png" width="360" alt="生成的分享卡片示例">
+   <img src="docs/show_2.png" width="360" alt="生成的分享卡片示例">
+   <img src="docs/show_3.png" width="360" alt="生成的分享卡片示例">
+</p>
 
 ## 功能
 
