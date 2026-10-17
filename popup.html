@@ -33,7 +33,14 @@
     </label>
   </div>
 
-  <button id="go" disabled>生成并复制</button>
+  <div class="goRow">
+    <button id="bgToggle" type="button" class="on" title="封面作背景：开">
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+        <path fill="currentColor" d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3 3.5-4.5 4.5 6H5l3.5-4.5z"/>
+      </svg>
+    </button>
+    <button id="go" disabled>生成并复制</button>
+  </div>
   <div id="msg" class="msg"></div>
   <div id="preview" class="preview"></div>
 

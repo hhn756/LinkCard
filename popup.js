@@ -137,6 +137,7 @@ async function generate() {
       pageDesc: pageInfo.desc,
       linkUrl: pageInfo.url,
       cover,
+      bgCover: $("bgToggle").classList.contains("on"),
     });
 
     showPreview(canvas, W, H);
@@ -151,5 +152,32 @@ async function generate() {
   }
 }
 
+// 「封面作背景」开关：拼在生成按钮左侧的小段按钮，状态用 chrome.storage 记住
+async function setBgCover(on) {
+  $("bgToggle").classList.toggle("on", on);
+  $("bgToggle").title = on ? "封面作背景：开" : "封面作背景：关";
+  try {
+    await chrome.storage.local.set({ bgCover: on });
+  } catch (e) {
+    console.warn("保存开关状态失败：", e);
+  }
+}
+
+$("bgToggle").addEventListener("click", (e) => {
+  setBgCover(!e.currentTarget.classList.contains("on"));
+});
+
 $("go").addEventListener("click", generate);
+
+// 恢复上次的开关状态；没存过时默认开
+(async () => {
+  let on = true;
+  try {
+    const saved = await chrome.storage.local.get("bgCover");
+    if (typeof saved.bgCover === "boolean") on = saved.bgCover;
+  } catch (e) {
+    console.warn("读取开关状态失败：", e);
+  }
+  setBgCover(on);
+})();
 init();

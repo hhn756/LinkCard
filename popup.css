@@ -73,6 +73,38 @@ textarea:focus {
   flex: 1;
 }
 
+/* 生成按钮行：左侧「封面作背景」开关 + 生成按钮，拼成一体 */
+.goRow {
+  display: flex;
+}
+
+.goRow button {
+  width: auto;
+}
+
+#bgToggle {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  padding: 0;
+  border-radius: 4px 0 0 4px;
+  background: #c4c8cd;
+  color: #646a73;
+  box-shadow: inset -1px 0 0 rgba(0, 0, 0, 0.08);
+}
+
+#bgToggle.on {
+  background: #3a72d9;
+  color: #fff;
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.35);
+}
+
+#go {
+  flex: 1;
+  border-radius: 0 4px 4px 0;
+}
+
 button {
   width: 100%;
   padding: 7px 0;

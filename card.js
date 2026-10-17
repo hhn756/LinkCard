@@ -100,6 +100,7 @@ function shortenUrl(url) {
  * @param {string} o.pageDesc  页面描述
  * @param {string} o.linkUrl   完整链接，画在底部并生成二维码（B 站视频会缩短为 b23.tv）
  * @param {ImageBitmap|null} o.cover 封面图
+ * @param {boolean} [o.bgCover=true] 封面作背景（模糊铺底+毛玻璃面板）；关闭后白底配色，封面仅作中部大图/缩略图
  */
 function drawCard(o) {
   const W = o.width;
@@ -111,6 +112,7 @@ function drawCard(o) {
   const pageDesc = o.pageDesc || "";
   const linkUrl = shortenUrl(o.linkUrl);
   const cover = o.cover || null;
+  const bgOn = o.bgCover !== false;
 
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(W * scale);
@@ -183,8 +185,8 @@ function drawCard(o) {
 
   const footerY = linkTop - link_gap - footer_h;
 
-  // ---------- 背景：有封面时铺放大模糊封面，底部垫左贴边、右淡出的毛玻璃 ----------
-  if (cover) {
+  // ---------- 背景：有封面且开启 bgCover 时铺放大模糊封面，底部垫左贴边、右淡出的毛玻璃 ----------
+  if (cover && bgOn) {
     const blurBg    = W * 0.03; // 全卡背景的模糊度
     const blurPanel = W * 0.08; // 毛玻璃：面板背后的内容比背景再糊一档
     const m = blurPanel * 2;    // 图四边外扩，避免模糊边缘在卡片边界发白（按更大的模糊量算）
@@ -292,9 +294,10 @@ function drawCard(o) {
 
   // ---------- 底部信息条：页面标题 / 描述（有备注时封面缩略图在文字左侧） ----------
   // 封面只在中部大图（无备注）与这里二选一，避免同一张图出现两次
-  const colPageTitle = cover ? COLOR_PAGE_TITLE : COLOR_PAGE_TITLE_PLAIN;
-  const colPageDesc  = cover ? COLOR_PAGE_DESC  : COLOR_PAGE_DESC_PLAIN;
-  const colUrl       = cover ? COLOR_URL_COVER  : COLOR_PAGE_TITLE_PLAIN;
+  // 配色跟背景走：毛玻璃上用浅色，白底上回落到灰
+  const colPageTitle = bgOn ? COLOR_PAGE_TITLE : COLOR_PAGE_TITLE_PLAIN;
+  const colPageDesc  = bgOn ? COLOR_PAGE_DESC  : COLOR_PAGE_DESC_PLAIN;
+  const colUrl       = bgOn ? COLOR_URL_COVER  : COLOR_PAGE_TITLE_PLAIN;
 
   // 缩略图布局：和下方链接条同构——图在左，文本排其右侧
   const iconSize  = (note && cover) ? Math.min(footer_w * 0.21, footer_h * 0.80) : 0;
