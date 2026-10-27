@@ -15,10 +15,11 @@ const COLOR_INFO_BG    = "rgba(240, 242, 245, 0.05)";
 const COLOR_QR_BG      = "rgba(255, 255, 255, 0.85)"; // 半透明白：够亮保证对比，又不会硬切一块
 
 // ---------- 文本色自适应 ----------
-// 采样文字下方背景 B，把目标色 F 外推成填充色 T；α 为文字整体不透明度，参与最终合成
-// mode = "auto"：按背景亮度取黑或白，T = gray(L + β(target − L))
-// mode = "color"：保留色调，把 F 推离 B，T = F + β(F − B)；对比度不够时退回自动明暗
-const ADAPT_MIN_CR = 4.5; // 保留色调模式的最低对比度（WCAG），不够就兜底
+// 采样文字下方背景 B，按反差强度 β 从 B 往端点色拉开距离；α 为文字整体不透明度，参与最终合成
+// β = 0 与背景同色，β = 1 保留色调模式下刚好达到 ADAPT_MIN_CR，β = 2 压到纯黑或纯白
+// mode = "auto"：沿亮度插值到端点，β 到 1 就已是纯黑或纯白
+// mode = "color"：保留 F 的色相，只把明度往端点推
+const ADAPT_MIN_CR = 4.5; // 保留色调模式在 β = 1 时的目标对比度（WCAG AA 正文）
 const clamp01   = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
 const srgbToLin = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
 const linToSrgb = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055);
@@ -58,21 +59,47 @@ function contrastRatio(a, b) {
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
 
-// 自动明暗：按背景亮度取黑或白，β 控制向目标压的力度
+// 黑或白，哪个和背景对比更高就拿哪个当端点
+function contrastEnd(bg) {
+  return contrastRatio([0, 0, 0], bg) >= contrastRatio([1, 1, 1], bg) ? 0 : 1;
+}
+
+// 自动明暗：从背景亮度往端点插值，β = 0 贴着背景，β ≥ 1 纯黑或纯白
 function autoTextColor(bg, beta) {
   const L = luminance(bg);
-  const target = L >= 0.5 ? 0 : 1;
+  const target = contrastEnd(bg);
   const v = linToSrgb(clamp01(L + beta * (target - L)));
   return [v, v, v];
+}
+
+// 把 F 按 k 推向端点：k = 0 原色，k = 1 纯黑或纯白；等比压暗或掺白，色相大致保持
+function towardEnd(fg, end, k) {
+  return fg.map((c) => (end === 1 ? c + (1 - c) * k : c * (1 - k)));
+}
+
+// 不够对比度时把 F 往端点推，找到刚好达到 ADAPT_MIN_CR 的着色
+function readableTint(fg, bg, end) {
+  const meets = (k) => contrastRatio(towardEnd(fg, end, k), bg) >= ADAPT_MIN_CR;
+  if (meets(0)) return fg;
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < 20; i++) {
+    const mid = (lo + hi) / 2;
+    if (meets(mid)) hi = mid;
+    else lo = mid;
+  }
+  return towardEnd(fg, end, hi);
 }
 
 // 由目标色 F 和背景 B 推算文字填充色（0..1 sRGB）
 function adaptTextColor(fg, bg, mode, beta) {
   if (mode === "auto") return autoTextColor(bg, beta);
 
-  const t = fg.map((c, i) => clamp01(c + beta * (c - bg[i])));
-  if (contrastRatio(t, bg) >= ADAPT_MIN_CR) return t;
-  return autoTextColor(bg, 1); // 兜底：直接压到黑白
+  const end = contrastEnd(bg);
+  const tint = readableTint(fg, bg, end);
+  // 前半段：从背景色淡入着色；后半段：着色继续压向纯黑/白
+  if (beta <= 1) return tint.map((c, i) => bg[i] + (c - bg[i]) * beta);
+  return tint.map((c) => c + (end - c) * (beta - 1));
 }
 
 function setFont(ctx, size) {
