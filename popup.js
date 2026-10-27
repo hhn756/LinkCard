@@ -3,6 +3,12 @@ const $ = (id) => document.getElementById(id);
 let pageInfo = null; // { title, desc, image, url }
 let cover = null;    // ImageBitmap | null
 
+// 文字颜色自适应：alpha 文字浓度，beta 反差强度，mode 自动明暗 / 保留色调
+const textAdapt = { on: false, alpha: 1, beta: 1, mode: "auto" };
+
+// 卡片配色：标题颜色、备注底色、备注底色透明度
+const cardStyle = { titleColor: "#1f2329", noteBg: "#fff8dc", noteAlpha: 1 };
+
 function setMsg(text, isError) {
   const el = $("msg");
   el.textContent = text;
@@ -132,12 +138,18 @@ async function generate() {
       height: H,
       scale: 2,
       cardTitle: $("title").value.trim(),
+      titleColor: $("titleColor").value,
       note: $("note").value.trim(),
+      noteBg: $("noteBg").value,
+      noteAlpha: Number($("noteAlpha").value) / 100,
       pageTitle: pageInfo.title,
       pageDesc: pageInfo.desc,
       linkUrl: pageInfo.url,
       cover,
       bgCover: $("bgToggle").classList.contains("on"),
+      textAdapt: textAdapt.on
+        ? { alpha: textAdapt.alpha, beta: textAdapt.beta, mode: textAdapt.mode }
+        : null,
     });
 
     showPreview(canvas, W, H);
@@ -169,6 +181,138 @@ $("bgToggle").addEventListener("click", (e) => {
 
 $("go").addEventListener("click", generate);
 
+// 卡片标题与备注折叠区：开关状态用 chrome.storage 记住
+function setFold(open) {
+  $("fold").classList.toggle("open", open);
+  $("foldToggle").setAttribute("aria-expanded", String(open));
+  $("foldBody").hidden = !open;
+}
+
+$("foldToggle").addEventListener("click", async () => {
+  const open = !$("fold").classList.contains("open");
+  setFold(open);
+  try {
+    await chrome.storage.local.set({ foldOpen: open });
+  } catch (e) {
+    console.warn("保存折叠状态失败：", e);
+  }
+});
+
+// 卡片配色：改动后落盘，下次打开 popup 回填
+function syncStyleUI() {
+  $("titleColor").value = cardStyle.titleColor;
+  $("noteBg").value = cardStyle.noteBg;
+  $("noteAlpha").value = Math.round(cardStyle.noteAlpha * 100);
+}
+
+async function saveStyle() {
+  try {
+    await chrome.storage.local.set({ cardStyle });
+  } catch (e) {
+    console.warn("保存卡片配色失败：", e);
+  }
+}
+
+async function loadStyle() {
+  try {
+    const saved = await chrome.storage.local.get("cardStyle");
+    const s = saved.cardStyle;
+    if (s && typeof s === "object") {
+      if (typeof s.titleColor === "string") cardStyle.titleColor = s.titleColor;
+      if (typeof s.noteBg === "string") cardStyle.noteBg = s.noteBg;
+      if (Number.isFinite(s.noteAlpha)) cardStyle.noteAlpha = s.noteAlpha;
+    }
+  } catch (e) {
+    console.warn("读取卡片配色失败：", e);
+  }
+  syncStyleUI();
+}
+
+$("titleColor").addEventListener("change", (e) => {
+  cardStyle.titleColor = e.target.value;
+  saveStyle();
+});
+
+$("noteBg").addEventListener("change", (e) => {
+  cardStyle.noteBg = e.target.value;
+  saveStyle();
+});
+
+// 拖动时先用输入框的值，松手（change）再落盘
+$("noteAlpha").addEventListener("change", (e) => {
+  cardStyle.noteAlpha = e.target.value / 100;
+  saveStyle();
+});
+
+// 文字颜色自适应面板：开关 + 三个参数，设置记到 chrome.storage
+function syncAdaptUI() {
+  const on = textAdapt.on;
+  $("adapt").classList.toggle("on", on);
+  $("adaptToggle").setAttribute("aria-pressed", String(on));
+  $("adaptState").textContent = on ? "开" : "关";
+  $("adaptBody").hidden = !on;
+
+  const pct = Math.round(textAdapt.alpha * 100);
+  $("adaptAlpha").value = pct;
+  $("adaptAlphaV").textContent = pct + "%";
+  $("adaptBeta").value = textAdapt.beta;
+  $("adaptBetaV").textContent = textAdapt.beta.toFixed(1);
+  for (const btn of $("adaptMode").querySelectorAll("button")) {
+    btn.classList.toggle("on", btn.dataset.mode === textAdapt.mode);
+  }
+}
+
+async function saveAdapt() {
+  try {
+    await chrome.storage.local.set({ textAdapt });
+  } catch (e) {
+    console.warn("保存文字配色设置失败：", e);
+  }
+}
+
+async function loadAdapt() {
+  try {
+    const saved = await chrome.storage.local.get("textAdapt");
+    const s = saved.textAdapt;
+    if (s && typeof s === "object") {
+      if (typeof s.on === "boolean") textAdapt.on = s.on;
+      if (Number.isFinite(s.alpha)) textAdapt.alpha = s.alpha;
+      if (Number.isFinite(s.beta)) textAdapt.beta = s.beta;
+      if (s.mode === "auto" || s.mode === "color") textAdapt.mode = s.mode;
+    }
+  } catch (e) {
+    console.warn("读取文字配色设置失败：", e);
+  }
+  syncAdaptUI();
+}
+
+$("adaptToggle").addEventListener("click", () => {
+  textAdapt.on = !textAdapt.on;
+  syncAdaptUI();
+  saveAdapt();
+});
+
+// 拖动滑杆时只更新数值，松手（change）再落盘
+$("adaptAlpha").addEventListener("input", (e) => {
+  textAdapt.alpha = e.target.value / 100;
+  $("adaptAlphaV").textContent = e.target.value + "%";
+});
+$("adaptAlpha").addEventListener("change", saveAdapt);
+
+$("adaptBeta").addEventListener("input", (e) => {
+  textAdapt.beta = Number(e.target.value);
+  $("adaptBetaV").textContent = textAdapt.beta.toFixed(1);
+});
+$("adaptBeta").addEventListener("change", saveAdapt);
+
+$("adaptMode").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-mode]");
+  if (!btn) return;
+  textAdapt.mode = btn.dataset.mode;
+  syncAdaptUI();
+  saveAdapt();
+});
+
 // 恢复上次的开关状态；没存过时默认开
 (async () => {
   let on = true;
@@ -180,4 +324,19 @@ $("go").addEventListener("click", generate);
   }
   setBgCover(on);
 })();
+
+// 恢复折叠状态；没存过时默认展开
+(async () => {
+  let open = true;
+  try {
+    const saved = await chrome.storage.local.get("foldOpen");
+    if (typeof saved.foldOpen === "boolean") open = saved.foldOpen;
+  } catch (e) {
+    console.warn("读取折叠状态失败：", e);
+  }
+  setFold(open);
+})();
+
+loadStyle();
+loadAdapt();
 init();

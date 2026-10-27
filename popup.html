@@ -12,15 +12,55 @@
     <div id="purl" class="purl"></div>
   </div>
 
-  <label class="field">
-    <span>卡片标题</span>
-    <input id="title" type="text" placeholder="留空则不显示">
-  </label>
+  <div id="fold" class="fold open">
+    <button id="foldToggle" type="button" class="foldHead" aria-expanded="true">
+      <span>卡片标题与备注</span>
+      <span class="foldArrow">▾</span>
+    </button>
+    <div id="foldBody" class="foldBody">
+      <div class="field">
+        <span>卡片标题</span>
+        <div class="inputBox">
+          <input id="title" type="text" placeholder="留空则不显示">
+          <input id="titleColor" type="color" value="#1f2329" title="标题颜色">
+        </div>
+      </div>
 
-  <label class="field">
-    <span>备注</span>
-    <textarea id="note" rows="3" placeholder="留空则中部显示封面大图"></textarea>
-  </label>
+      <div class="field">
+        <span>备注</span>
+        <div class="noteBox">
+          <textarea id="note" rows="3" placeholder="留空则中部显示封面大图"></textarea>
+          <div class="noteBar">
+            <input id="noteBg" type="color" value="#fff8dc" title="备注底色">
+            <input id="noteAlpha" type="range" min="0" max="100" step="5" value="100" title="备注底色透明度">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="adapt" class="adapt">
+    <button id="adaptToggle" type="button" class="adaptHead" aria-pressed="false">
+      <span>文字颜色自适应</span>
+      <span id="adaptState" class="adaptState">关</span>
+    </button>
+    <div id="adaptBody" class="adaptBody" hidden>
+      <label class="ctrl">
+        <span>文字浓度</span>
+        <input id="adaptAlpha" type="range" min="20" max="100" step="10" value="100">
+        <span id="adaptAlphaV" class="adaptVal">100%</span>
+      </label>
+      <label class="ctrl">
+        <span>反差强度</span>
+        <input id="adaptBeta" type="range" min="0" max="2" step="0.1" value="1">
+        <span id="adaptBetaV" class="adaptVal">1.0</span>
+      </label>
+      <div id="adaptMode" class="seg">
+        <button type="button" data-mode="auto" class="on">自动明暗</button>
+        <button type="button" data-mode="color">保留色调</button>
+      </div>
+    </div>
+  </div>
 
   <div class="row">
     <label class="field">

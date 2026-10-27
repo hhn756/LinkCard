@@ -1,4 +1,4 @@
-// ========== 卡片绘制（Canvas 版，布局与 main.py 的 draw_card 一致） ==========
+// ========== 卡片绘制 ==========
 
 const FONT_STACK = '"Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", "Source Han Sans SC", sans-serif';
 
@@ -13,6 +13,67 @@ const COLOR_PAGE_TITLE_PLAIN = "#8b9098"; // 无封面白底时：页面标题 /
 const COLOR_PAGE_DESC_PLAIN  = "#b9bec6"; // 无封面白底时：页面描述
 const COLOR_INFO_BG    = "rgba(240, 242, 245, 0.05)";
 const COLOR_QR_BG      = "rgba(255, 255, 255, 0.85)"; // 半透明白：够亮保证对比，又不会硬切一块
+
+// ---------- 文本色自适应 ----------
+// 采样文字下方背景 B，把目标色 F 外推成填充色 T；α 为文字整体不透明度，参与最终合成
+// mode = "auto"：按背景亮度取黑或白，T = gray(L + β(target − L))
+// mode = "color"：保留色调，把 F 推离 B，T = F + β(F − B)；对比度不够时退回自动明暗
+const ADAPT_MIN_CR = 4.5; // 保留色调模式的最低对比度（WCAG），不够就兜底
+const clamp01   = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
+const srgbToLin = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+const linToSrgb = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055);
+const luminance = (c) => 0.2126 * srgbToLin(c[0]) + 0.7152 * srgbToLin(c[1]) + 0.0722 * srgbToLin(c[2]);
+
+function hexToRgb01(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+}
+
+function rgbCss(c) {
+  return `rgb(${Math.round(c[0] * 255)}, ${Math.round(c[1] * 255)}, ${Math.round(c[2] * 255)})`;
+}
+
+// 取一块区域的平均背景色（0..1 sRGB）；坐标按逻辑像素，内部换算成设备像素
+function sampleBackground(ctx, x, y, w, h, scale) {
+  const cw = ctx.canvas.width;
+  const ch = ctx.canvas.height;
+  const sx = Math.max(0, Math.min(cw - 1, Math.round(x * scale)));
+  const sy = Math.max(0, Math.min(ch - 1, Math.round(y * scale)));
+  const sw = Math.max(1, Math.min(cw - sx, Math.round(w * scale)));
+  const sh = Math.max(1, Math.min(ch - sy, Math.round(h * scale)));
+  const data = ctx.getImageData(sx, sy, sw, sh).data;
+  let r = 0, g = 0, b = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    r += data[i];
+    g += data[i + 1];
+    b += data[i + 2];
+  }
+  const n = (data.length / 4) * 255;
+  return [r / n, g / n, b / n];
+}
+
+function contrastRatio(a, b) {
+  const la = luminance(a);
+  const lb = luminance(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+// 自动明暗：按背景亮度取黑或白，β 控制向目标压的力度
+function autoTextColor(bg, beta) {
+  const L = luminance(bg);
+  const target = L >= 0.5 ? 0 : 1;
+  const v = linToSrgb(clamp01(L + beta * (target - L)));
+  return [v, v, v];
+}
+
+// 由目标色 F 和背景 B 推算文字填充色（0..1 sRGB）
+function adaptTextColor(fg, bg, mode, beta) {
+  if (mode === "auto") return autoTextColor(bg, beta);
+
+  const t = fg.map((c, i) => clamp01(c + beta * (c - bg[i])));
+  if (contrastRatio(t, bg) >= ADAPT_MIN_CR) return t;
+  return autoTextColor(bg, 1); // 兜底：直接压到黑白
+}
 
 function setFont(ctx, size) {
   ctx.font = `${size}px ${FONT_STACK}`;
@@ -95,24 +156,32 @@ function shortenUrl(url) {
  * @param {number} o.height    卡片逻辑高度
  * @param {number} o.scale     像素倍率（输出尺寸 = 逻辑尺寸 × scale）
  * @param {string} o.cardTitle 顶部标题，空则不画
+ * @param {string} [o.titleColor="#1f2329"] 顶部标题颜色
  * @param {string} o.note      备注，非空时中部画备注框
+ * @param {string} [o.noteBg="#fff8dc"] 备注框底色
+ * @param {number} [o.noteAlpha=1] 备注框底色不透明度 0..1
  * @param {string} o.pageTitle 页面标题
  * @param {string} o.pageDesc  页面描述
  * @param {string} o.linkUrl   完整链接，画在底部并生成二维码（B 站视频会缩短为 b23.tv）
  * @param {ImageBitmap|null} o.cover 封面图
  * @param {boolean} [o.bgCover=true] 封面作背景（模糊铺底+毛玻璃面板）；关闭后白底配色，封面仅作中部大图/缩略图
+ * @param {{alpha:number, beta:number, mode:"auto"|"color"}|null} [o.textAdapt] 底部信息区文字色自适应；不传则用固定配色
  */
 function drawCard(o) {
   const W = o.width;
   const H = o.height;
   const scale = o.scale || 1;
   const cardTitle = o.cardTitle || "";
+  const titleColor = o.titleColor || COLOR_TITLE;
   const note = o.note || "";
+  const noteBg = o.noteBg || COLOR_NOTE_BG;
+  const noteAlpha = Number.isFinite(o.noteAlpha) ? o.noteAlpha : 1;
   const pageTitle = o.pageTitle || "";
   const pageDesc = o.pageDesc || "";
   const linkUrl = shortenUrl(o.linkUrl);
   const cover = o.cover || null;
   const bgOn = o.bgCover !== false;
+  const textAdapt = o.textAdapt || null; // 底部文字色自适应设置，null 表示用固定配色
 
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(W * scale);
@@ -126,6 +195,17 @@ function drawCard(o) {
     ctx.fillStyle = color;
     ctx.fillText(text, x, y);
   };
+  // 采样文字所在处的背景，按设置推算填充色和透明度后再画
+  const paintAdaptive = (x, y, text, size, fgHex) => {
+    const bg = sampleBackground(ctx, x, y, textWidth(ctx, text, size), size, scale);
+    const color = adaptTextColor(hexToRgb01(fgHex), bg, textAdapt.mode, textAdapt.beta);
+    ctx.save();
+    ctx.globalAlpha = textAdapt.alpha;
+    paint(x, y, text, size, rgbCss(color));
+    ctx.restore();
+  };
+  // 未启用自适应时直接用调色板颜色
+  const paintFooter = textAdapt ? paintAdaptive : paint;
   const roundBox = (x, y, w, h, r) => {
     ctx.beginPath();
     ctx.roundRect(x, y, w, h, r);
@@ -240,7 +320,7 @@ function drawCard(o) {
   if (cardTitle) {
     const titleLineH = title_size * title_lh_mul;
     for (const line of wrapText(ctx, cardTitle, title_size, W - 2 * pad_top)) {
-      paint((W - textWidth(ctx, line, title_size)) / 2, y, line, title_size, COLOR_TITLE);
+      paint((W - textWidth(ctx, line, title_size)) / 2, y, line, title_size, titleColor);
       y += titleLineH;
     }
     y += gap_title_note;
@@ -268,9 +348,12 @@ function drawCard(o) {
 
     if (noteLines.length) {
       const boxH = noteLines.length * noteLineH + 2 * note_py;
-      ctx.fillStyle = COLOR_NOTE_BG;
+      ctx.save();
+      ctx.globalAlpha = noteAlpha;
+      ctx.fillStyle = noteBg;
       roundBox(note_mx, midTop, W - 2 * note_mx, boxH, note_radius);
       ctx.fill();
+      ctx.restore();
 
       let ty = midTop + note_py;
       for (const line of noteLines) {
@@ -294,7 +377,7 @@ function drawCard(o) {
 
   // ---------- 底部信息条：页面标题 / 描述（有备注时封面缩略图在文字左侧） ----------
   // 封面只在中部大图（无备注）与这里二选一，避免同一张图出现两次
-  // 配色跟背景走：毛玻璃上用浅色，白底上回落到灰
+  // 候选色跟背景走：毛玻璃上用浅色，白底上回落到灰；启用自适应时作为目标色 F 参与推算
   const colPageTitle = bgOn ? COLOR_PAGE_TITLE : COLOR_PAGE_TITLE_PLAIN;
   const colPageDesc  = bgOn ? COLOR_PAGE_DESC  : COLOR_PAGE_DESC_PLAIN;
   const colUrl       = bgOn ? COLOR_URL_COVER  : COLOR_PAGE_TITLE_PLAIN;
@@ -311,10 +394,10 @@ function drawCard(o) {
   if (pdesc) {
     const totalH = page_title_size + gapV + page_desc_size;
     const ty = footerY + (footer_h - totalH) / 2;
-    paint(metaX, ty, ptitle, page_title_size, colPageTitle);
-    paint(metaX, ty + page_title_size + gapV, pdesc, page_desc_size, colPageDesc);
+    paintFooter(metaX, ty, ptitle, page_title_size, colPageTitle);
+    paintFooter(metaX, ty + page_title_size + gapV, pdesc, page_desc_size, colPageDesc);
   } else {
-    paint(metaX, footerY + (footer_h - page_title_size) / 2, ptitle, page_title_size, colPageTitle);
+    paintFooter(metaX, footerY + (footer_h - page_title_size) / 2, ptitle, page_title_size, colPageTitle);
   }
 
   if (iconSize) {
@@ -337,7 +420,7 @@ function drawCard(o) {
   if (urlLines.length || qr) {
     let ty = linkTop + (linkH - urlH) / 2;
     for (const line of urlLines) {
-      paint(urlX, ty, line, url_size, colUrl);
+      paintFooter(urlX, ty, line, url_size, colUrl);
       ty += urlLineH;
     }
 
